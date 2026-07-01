@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-实验3：软件开发工具与测试基础 —— 小型人工智能基础问答系统
-功能：基于关键词集合交集匹配的AI基础问答系统，支持可视化交互、历史记录、匹配详情展示
-"""
-
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 import re
@@ -415,17 +408,54 @@ class QAApp:
             bg=self.BG_LIGHT, fg=self.ACCENT
         ).pack(side=tk.LEFT, padx=15, pady=10)
 
-        # 知识库统计
-        stats_text = "知识库: {}题 | 关键词: {}个 | 分类: {}组".format(
-            len(self.kb.qa_dict),
-            len(self.kb.all_keywords),
-            len(self.kb.keyword_index)
+        # 知识库统计（可点击查看详情）
+        stats_frame = tk.Frame(header, bg=self.BG_LIGHT)
+        stats_frame.pack(side=tk.RIGHT, padx=15)
+
+        lbl_q = tk.Label(
+            stats_frame, text="知识库: {}题".format(len(self.kb.qa_dict)),
+            font=("Microsoft YaHei", 9),
+            bg=self.BG_LIGHT, fg=self.ACCENT,
+            cursor="hand2"
         )
+        lbl_q.pack(side=tk.LEFT, padx=(0, 2))
+        lbl_q.bind("<Button-1>", lambda e: self._show_all_questions())
+        lbl_q.bind("<Enter>", lambda e: lbl_q.configure(fg=self.ACCENT_HOVER))
+        lbl_q.bind("<Leave>", lambda e: lbl_q.configure(fg=self.ACCENT))
+
         tk.Label(
-            header, text=stats_text,
+            stats_frame, text="|",
             font=("Microsoft YaHei", 9),
             bg=self.BG_LIGHT, fg=self.FG_DIM
-        ).pack(side=tk.RIGHT, padx=15)
+        ).pack(side=tk.LEFT, padx=2)
+
+        lbl_kw = tk.Label(
+            stats_frame, text="关键词: {}个".format(len(self.kb.all_keywords)),
+            font=("Microsoft YaHei", 9),
+            bg=self.BG_LIGHT, fg=self.ACCENT,
+            cursor="hand2"
+        )
+        lbl_kw.pack(side=tk.LEFT, padx=(0, 2))
+        lbl_kw.bind("<Button-1>", lambda e: self._show_all_keywords())
+        lbl_kw.bind("<Enter>", lambda e: lbl_kw.configure(fg=self.ACCENT_HOVER))
+        lbl_kw.bind("<Leave>", lambda e: lbl_kw.configure(fg=self.ACCENT))
+
+        tk.Label(
+            stats_frame, text="|",
+            font=("Microsoft YaHei", 9),
+            bg=self.BG_LIGHT, fg=self.FG_DIM
+        ).pack(side=tk.LEFT, padx=2)
+
+        lbl_cat = tk.Label(
+            stats_frame, text="分类: {}组".format(len(self.kb.keyword_index)),
+            font=("Microsoft YaHei", 9),
+            bg=self.BG_LIGHT, fg=self.ACCENT,
+            cursor="hand2"
+        )
+        lbl_cat.pack(side=tk.LEFT, padx=(0, 2))
+        lbl_cat.bind("<Button-1>", lambda e: self._show_all_categories_detail())
+        lbl_cat.bind("<Enter>", lambda e: lbl_cat.configure(fg=self.ACCENT_HOVER))
+        lbl_cat.bind("<Leave>", lambda e: lbl_cat.configure(fg=self.ACCENT))
 
         # ---- 主区域：左右分栏 ----
         main_frame = tk.Frame(self.root, bg=self.BG)
@@ -733,6 +763,76 @@ class QAApp:
                 self._append_display("    → {}\n".format(display_q), tag="meta")
             if len(questions) > 3:
                 self._append_display("    ... 等共{}题\n".format(len(questions)), tag="meta")
+
+    def _show_all_questions(self):
+        """点击'知识库:N题'：在对话区展示全部知识库问答内容"""
+        self._append_display("\n", tag="separator")
+        self._append_display(
+            "═══ 知识库全部内容（共{}题） ═══\n".format(len(self.kb.qa_dict)),
+            tag="system"
+        )
+
+        # 字典遍历：逐条展示每个问题及其答案
+        for i, (question, answer) in enumerate(self.kb.qa_dict.items(), 1):
+            self._append_display("\n  {}. {}\n".format(i, question), tag="user")
+            self._append_display("     {}\n".format(answer), tag="bot")
+
+        self._append_display(
+            "\n── 共 {} 条知识库记录 ──\n".format(len(self.kb.qa_dict)),
+            tag="meta"
+        )
+
+    def _show_all_keywords(self):
+        """点击'关键词:N个'：在对话区展示全部去重关键词"""
+        self._append_display("\n", tag="separator")
+        self._append_display(
+            "═══ 全部关键词（共{}个，已去重） ═══\n".format(len(self.kb.all_keywords)),
+            tag="system"
+        )
+
+        # 集合遍历：按字母/拼音排序展示所有关键词
+        sorted_kws = sorted(self.kb.all_keywords)
+        # 每行展示5个关键词，格式化对齐
+        line = "  "
+        for i, kw in enumerate(sorted_kws, 1):
+            line += "{:<12}".format(kw)
+            if i % 5 == 0:
+                self._append_display(line + "\n", tag="meta")
+                line = "  "
+        if line.strip():
+            self._append_display(line + "\n", tag="meta")
+
+        self._append_display(
+            "\n── 共 {} 个关键词（集合自动去重） ──\n".format(len(self.kb.all_keywords)),
+            tag="meta"
+        )
+
+    def _show_all_categories_detail(self):
+        """点击'分类:N组'：在对话区展示全部关键词分类及对应问题"""
+        categories = self.kb.get_categories()
+
+        self._append_display("\n", tag="separator")
+        self._append_display(
+            "═══ 知识库按关键词分类（共{}组） ═══\n".format(len(categories)),
+            tag="system"
+        )
+
+        # 字典遍历：按包含问题数量降序展示全部分类
+        sorted_cats = sorted(categories.items(), key=lambda x: len(x[1]), reverse=True)
+        for idx, (kw, questions) in enumerate(sorted_cats, 1):
+            self._append_display(
+                "\n  【{}】{} — 共{}题\n".format(idx, kw, len(questions)),
+                tag="meta"
+            )
+            # 列表遍历：展示该分类下的所有问题
+            for j, q in enumerate(questions, 1):
+                display_q = q[:25] + "..." if len(q) > 25 else q
+                self._append_display("    {}. {}\n".format(j, display_q), tag="meta")
+
+        self._append_display(
+            "\n── 共 {} 组分类（倒排索引结构） ──\n".format(len(categories)),
+            tag="meta"
+        )
 
     def _clear_display(self):
         """清空对话显示区"""
